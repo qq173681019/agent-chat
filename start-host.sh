@@ -117,9 +117,9 @@ echo "  Tunnel: $TUNNEL_URL"
 echo "  =========================="
 echo ""
 
-# Open browser
-command -v open &> /dev/null && open "$TUNNEL_URL"
-command -v xdg-open &> /dev/null && xdg-open "$TUNNEL_URL"
+# Open browser (fixed Vercel URL)
+command -v open &> /dev/null && open 'https://agent-chat-d1m3.vercel.app'
+command -v xdg-open &> /dev/null && xdg-open 'https://agent-chat-d1m3.vercel.app'
 
 echo "  Press Ctrl+C to stop all services"
 echo ""

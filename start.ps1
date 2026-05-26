@@ -107,8 +107,8 @@ Write-Host "  Tunnel: $tunnelUrl"
 Write-Host '  ===================='
 Write-Host ''
 
-# Open browser
-Start-Process $tunnelUrl
+# Open browser (fixed Vercel URL)
+Start-Process 'https://agent-chat-d1m3.vercel.app'
 
 Write-Host '  Press Enter to close this window (servers keep running)...'
 Read-Host
