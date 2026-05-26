@@ -106,3 +106,64 @@ agent-chat/
 ## License
 
 MIT
+
+---
+
+## 🔁 隧道地址维护规则
+
+### 背景
+每次重启 cloudflared 隧道都会生成**新地址**，必须同步到 GitHub 才能让 Vercel 前端拿到。
+
+### 隧道守护脚本（必读）
+
+项目里已有 `watch-tunnel.sh`，**在部署电脑上必须运行**：
+
+```bash
+screen -dmS tunnel-watch bash /Users/gongruolan/Documents/GitHub/agent-chat/watch-tunnel.sh
+```
+
+脚本每 60 秒检测隧道是否存活，断了自动重启并调用 `update-tunnel-url.sh` 推送新地址到 GitHub。
+
+### 手动更新隧道地址（万不得已时）
+
+如果在部署电脑上手动重启了 cloudflared，手动更新推送：
+
+```bash
+cd ~/Documents/GitHub/agent-chat
+
+# 获取当前隧道地址（从 cloudflared 日志）
+NEW_URL=$(strings /tmp/cloudflared.log | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1)
+
+# 更新 ws-url.json
+echo "{\"url\":\"$NEW_URL\",\"updated\":$(date +%s)000}" > ws-url.json
+
+# 更新 Vercel API 硬编码地址（防止 CDN 缓存问题）
+sed -i '' "s|url: 'https://[^']*'|url: '$NEW_URL'|g; s|updated: [0-9]*|updated: $(date +%s)000|g" vercel/api/ws-url.js
+
+# 推送
+git add ws-url.json vercel/api/ws-url.js
+git commit -m "chore: update tunnel URL ($(date +%H:%M:%S))"
+git push
+```
+
+### 验证连接
+
+```bash
+# 测试隧道是否可达（从任意网络）
+curl -s --max-time 5 "https://<隧道地址>/api/config"
+
+# 测试 Vercel 前端是否正常
+curl -s --max-time 5 "https://agent-chat-d1m3.vercel.app/"
+```
+
+### 常见问题
+
+**Q: 前端一直显示"连接中"？**  
+A: 执行 redeploy 让 Vercel API 读取最新隧道地址。
+
+**Q: curl 隧道地址超时？**  
+A: 部署电脑的 cloudflared 可能断了，检查 `screen -ls` 和 `ps aux | grep cloudflared`。
+
+**Q: 两个 AI Agent 都不说话？**  
+A: 检查 cron jobs 是否在跑：`openclaw cron list`
+
