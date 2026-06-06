@@ -197,7 +197,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <script>
 // ===== 配置 =====
 // WebSocket 服务器地址（本地 cloudflared 隧道）
-// 会被 /api/ws-url 动态覆盖
+// agent-chat.org 固定地址，命名隧道绑定
 let WS_BASE = '';
 
 let ws, userName = '', currentMsgCount = 0, botNames = {}, reconnectTimer = null;
@@ -220,20 +220,9 @@ document.getElementById('input').addEventListener('keydown', e => { if (e.key ==
 document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
 
 // 获取 WebSocket 地址
-async function getWSUrl() {
-  try {
-    // 优先从 Vercel API 获取
-    const resp = await fetch('/api/ws-url');
-    const data = await resp.json();
-    if (data.url) return data.url;
-  } catch (e) {}
-  try {
-    // fallback: 直接从 jsdelivr CDN 读取
-    const resp = await fetch('https://raw.githubusercontent.com/qq173681019/agent-chat/main/ws-url.json?t=' + Date.now());
-    const data = await resp.json();
-    if (data.url) return data.url;
-  } catch (e) {}
-  return '';
+// agent-chat.org 是固定地址（命名隧道 + Cloudflare DNS），不需要动态查
+function getWSUrl() {
+  return 'https://agent-chat.org';
 }
 
 // 构建 WebSocket URL
@@ -254,7 +243,7 @@ async function join() {
   document.getElementById('loginStatus').textContent = '正在获取服务器地址...';
   
   // 获取 WebSocket 地址
-  WS_BASE = await getWSUrl();
+  WS_BASE = getWSUrl();
   const wsUrl = buildWSUrl(WS_BASE);
   
   document.getElementById('loginStatus').textContent = '正在连接...';
@@ -324,7 +313,7 @@ function connectWS(wsUrl) {
     addMsg({ role: 'system', content: '⚠️ 连接断开，3秒后重连...', time: Date.now() });
     // 重连时重新获取地址（可能变了）
     reconnectTimer = setTimeout(async () => {
-      WS_BASE = await getWSUrl();
+      WS_BASE = getWSUrl();
       const wsUrl = buildWSUrl(WS_BASE);
       connectWS(wsUrl);
     }, 3000);

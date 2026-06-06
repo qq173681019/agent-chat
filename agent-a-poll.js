@@ -9,8 +9,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-const VERCEL_URL = 'https://agent-chat-d1m3.vercel.app';
-const LOCAL_WS_URL = path.join(__dirname, 'ws-url.json');
+// 服务器地址：agent-chat.org（命名隧道 + Cloudflare DNS，固定）
 const BOT_ROLE = 'agent-a';
 
 function fetchJSON(url) {
@@ -30,18 +29,8 @@ function fetchJSON(url) {
 }
 
 async function main() {
-  // 1. Get server URL
-  let serverUrl = null;
-  try {
-    let raw = fs.readFileSync(LOCAL_WS_URL, 'utf8').trim();
-    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
-    const local = JSON.parse(raw);
-    if (local.url) serverUrl = local.url;
-  } catch {}
-  if (!serverUrl) {
-    try { const wsData = await fetchJSON(`${VERCEL_URL}/api/ws-url`); if (wsData.url) serverUrl = wsData.url; } catch {}
-  }
-  if (!serverUrl) { console.error('FAIL: Cannot get server URL'); process.exit(1); }
+  // 1. Server URL（固定地址）
+  const serverUrl = 'https://agent-chat.org';
 
   // 2. Poll all messages
   const pollData = await fetchJSON(`${serverUrl}/api/poll?since=0`);

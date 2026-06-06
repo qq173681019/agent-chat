@@ -52,46 +52,58 @@ if ! curl -s --max-time 3 http://localhost:3000/api/config > /dev/null 2>&1; the
 fi
 echo "  ✅ 服务器已启动"
 
-# ── 4. 启动 cloudflared 隧道 ──
-echo "  [4/5] 启动 Cloudflare 隧道..."
-screen -dmS cloudflared bash -c "cloudflared tunnel --url http://localhost:3000 > /tmp/cloudflared.log 2>&1"
+# ── 4. 检查命名隧道（agent-chat.org → localhost:3000） ──
+echo "  [4/5] 检查命名隧道..."
 
-TUNNEL_URL=""
-for i in $(seq 1 20); do
-    sleep 1
-    TUNNEL_URL=$(strings /tmp/cloudflared.log 2>/dev/null | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1)
-    [ -n "$TUNNEL_URL" ] && break
+# 检查是否有 cloudflared 在跑
+if ! pgrep -f "cloudflared tunnel" > /dev/null; then
+    # 没有就启动一个（用命名隧道的 token + 用户级 config）
+    TOKEN="eyJhIjoiYjkwMDhjMGFmZGE1MTc4ZGNlOWQyYjU0ODM4MzFlNTYiLCJ0IjoiMzAzNWQ0YzQtODJiMy00YmI5LWIzMGEtYjYwNWVjYzczNzU1IiwicyI6IlpUUXhaalV3TjJZdE9XSTFNaTAwWlRCbUxUaGxZVEl0Wmprek1ETXlPVGt5TW1NMyJ9"
+    if [ -f "$HOME/.cloudflared/config.yml" ]; then
+        nohup cloudflared tunnel run --token "$TOKEN" > "$HOME/.cloudflared/agent-chat.log" 2>&1 &
+        echo "  ✅ 已启动命名隧道（PID $!）"
+    else
+        echo "  ❌ 找不到 ~/.cloudflared/config.yml，隧道不会工作"
+        echo "     请先看 DNS-SETUP.md 把 ingress 规则写好"
+        exit 1
+    fi
+else
+    echo "  ✅ 命名隧道已在运行"
+fi
+
+# 验证域名能访问
+echo "  验证 https://agent-chat.org ..."
+VERIFY_OK=0
+for i in $(seq 1 15); do
+    if curl -s --max-time 5 "https://agent-chat.org/api/config" > /dev/null 2>&1; then
+        VERIFY_OK=1
+        break
+    fi
+    sleep 2
 done
 
-if [ -z "$TUNNEL_URL" ]; then
-    echo "  ❌ 隧道超时！检查: screen -r cloudflared"
-    exit 1
+if [ "$VERIFY_OK" = "1" ]; then
+    echo "  ✅ agent-chat.org 已就绪"
+else
+    echo "  ⚠️  隧道启动但域名还没通（检查 DNS 记录）"
 fi
-echo "  ✅ 隧道: $TUNNEL_URL"
 
-# ── 5. 更新 ws-url.json 并推送 ──
-echo "  [5/5] 推送隧道地址到 GitHub..."
-cd "$BASEDIR"
-UPDATED=$(date +%s)000
-
-echo "{\"url\":\"$TUNNEL_URL\",\"updated\":$UPDATED}" > ws-url.json
-
-sed -i '' "s|url: 'https://[^']*'|url: '$TUNNEL_URL'|g; s|updated: [0-9]*|updated: $UPDATED|g" vercel/api/ws-url.js 2>/dev/null || true
-
-git add ws-url.json vercel/api/ws-url.js
-git commit -m "chore: update tunnel URL ($(date +%H:%M:%S))" 2>/dev/null
-git push origin main 2>&1 | grep -E "To https|error|fatal" || echo "  ✅ 已推送"
-
+# ── 5. 完成 ──
+echo "  [5/5] 完成"
 echo ""
 echo "  ═══════════════════════════════════════"
 echo "  ✅ 全部就绪！"
+echo "  🌐 域名:   https://agent-chat.org  (固定地址，不会变)"
 echo "  🌐 本地:   http://localhost:3000"
-echo "  🌐 隧道:   $TUNNEL_URL"
-echo "  📡 前端:   https://agent-chat-d1m3.vercel.app/"
-echo "  🌐 正在打开浏览器..."
-open https://agent-chat-d1m3.vercel.app/
-echo "  🤖 轮询:   OpenClaw cron 自动运行"
 echo "  ═══════════════════════════════════════"
+echo ""
+echo "  正在打开浏览器..."
+open https://agent-chat.org/
+
+echo "  ═══════════════════════════════════════"
+echo "  ✅ 全部就绪！"
+echo "  🌐 本地:   http://localhost:3000"
+
 echo ""
 echo "  按 Enter 关闭（服务继续后台运行）..."
 read -r

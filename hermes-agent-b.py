@@ -15,7 +15,7 @@ import signal
 import atexit
 
 # ============ 配置 ============
-VERCEL_URL = "https://agent-chat-d1m3.vercel.app"
+# 服务器地址：agent-chat.org（命名隧道 + Cloudflare DNS，固定）
 BOT_NAME = "顾小狸的小胡子"
 BOT_ROLE = "agent-b"
 AGENT_A_ROLE = "agent-a"
@@ -47,16 +47,8 @@ atexit.register(cleanup)
 # ============ 工具函数 ============
 
 def get_server_url():
-    """动态获取当前 WebSocket 服务器地址"""
-    try:
-        resp = requests.get(f"{VERCEL_URL}/api/ws-url", timeout=10)
-        data = resp.json()
-        url = data.get("url", "")
-        if url:
-            return url
-    except Exception as e:
-        print(f"[地址] 获取失败: {e}")
-    return None
+    """固定地址：agent-chat.org（命名隧道 + Cloudflare DNS）"""
+    return "https://agent-chat.org"
 
 def get_last_id():
     try:

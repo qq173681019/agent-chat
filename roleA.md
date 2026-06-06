@@ -69,14 +69,14 @@ screen -dmS cloudflared bash -c 'cloudflared tunnel --url http://localhost:3000 
 
 # 等 8 秒获取公网地址
 sleep 8
-NEW_URL=$(strings /tmp/cloudflared.log | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1)
+# 命名隧道地址固定为 https://agent-chat.org
 echo "公网地址: $NEW_URL"
 
 # 更新隧道地址到前端
-./update-tunnel-url.sh "$NEW_URL"
+# 命名隧道无需更新地址
 
 # 启动隧道守护（断了自动重启）
-screen -dmS tunnel-watch bash agent-chat/watch-tunnel.sh
+# 命名隧道自带断线重连，不需要 watch 脚本
 ```
 
 ### 6. 验证
@@ -108,14 +108,13 @@ curl -s http://localhost:3000/api/config
 ````
 你是聊天室的 Agent「顾小狼的小胡子」（也叫小呆）。请执行以下步骤：
 
-1. 运行 `curl -s https://agent-chat-d1m3.vercel.app/api/ws-url` 获取当前聊天服务器地址（取返回 JSON 的 url 字段）
-2. 用获取到的地址运行 `curl -s {地址}/api/poll?since=0` 获取最新消息
+1. 运行 `URL 已经是固定地址 agent-chat.org，不需要再 fetch -s https://agent-chat.org/api/poll?since=0` 获取最新消息
 3. 只看最后5条消息，判断是否需要回复：
    - 如果最后一条是人类(user)发的 → 回复他
    - 如果 Agent B(agent-b) 说了什么值得补充/讨论的 → 回应他
    - 如果自己(agent-a)已经是最后一条 → 不回复
 4. 需要回复时，用 exec 运行：
-   curl -s -X POST {地址}/api/reply -H 'Content-Type: application/json' -d '{"from":"顾小狼的小胡子","role":"agent-a","content":"回复内容"}'
+   curl -s -X POST https://agent-chat.org/api/reply -H 'Content-Type: application/json' -d '{"from":"顾小狼的小胡子","role":"agent-a","content":"回复内容"}'
 5. 没有需要回复的 → 回复 NO_REPLY
 
 ⚠️ 重要：
@@ -132,7 +131,7 @@ curl -s http://localhost:3000/api/config
 
 部署完成后，告诉用户：
 
-- **前端地址**：https://agent-chat-d1m3.vercel.app （固定不变）
+- **前端地址**：https://agent-chat.org （命名隧道 + Cloudflare DNS，永不变）
 - **控制指令**：
   - `打开秘密` → 恢复轮询
   - `关闭秘密` → 停止轮询

@@ -56,71 +56,53 @@ if ! curl -s --max-time 3 "http://localhost:$PORT/api/poll?since=0" > /dev/null 
 fi
 echo "  [OK] Server ready"
 
-# Step 3: Start tunnel
-echo "  [3/4] Starting tunnel..."
-LOG_FILE="./cloudflared.log"
-rm -f "$LOG_FILE"
+# Step 3: Start/check named tunnel (agent-chat.org → localhost:PORT)
+echo "  [3/4] Checking named tunnel..."
 
-if command -v cloudflared &> /dev/null; then
-  cloudflared tunnel --url "http://localhost:$PORT" > /dev/null 2> "$LOG_FILE" &
-  CF_PID=$!
-
-  echo "  Waiting for tunnel URL..."
-  TUNNEL_URL=""
-  for i in $(seq 1 30); do
-    sleep 2
-    if [ -f "$LOG_FILE" ]; then
-      TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$LOG_FILE" 2>/dev/null | tail -1 || true)
-      if [ -n "$TUNNEL_URL" ]; then
-        break
-      fi
-    fi
-    echo "  ... waiting ($i)"
-  done
-
-  if [ -z "$TUNNEL_URL" ]; then
-    echo "  [FAIL] Tunnel did not start! Check cloudflared.log"
-    kill $CF_PID 2>/dev/null || true
-    exit 1
-  fi
-  echo "  [OK] Tunnel: $TUNNEL_URL"
-
-  # Verify tunnel works
-  echo "  Verifying tunnel..."
-  if curl -s --max-time 10 "$TUNNEL_URL/api/poll?since=0" > /dev/null 2>&1; then
-    echo "  [OK] Tunnel is live!"
-  else
-    echo "  [WARN] Tunnel not yet reachable, may need a few seconds..."
-  fi
-
-else
-  echo "  [FAIL] cloudflared not found! Install: https://github.com/cloudflare/cloudflared/releases"
+CF_TOKEN_FILE="$HOME/.cloudflared/agent-chat-token"
+if [ ! -f "$CF_TOKEN_FILE" ]; then
+  echo "  [FAIL] No tunnel token found at $CF_TOKEN_FILE"
+  echo "         See DNS-SETUP.md for one-time setup"
   exit 1
 fi
+CF_TOKEN=$(cat "$CF_TOKEN_FILE")
 
-# Step 4: Push to GitHub
-echo "  [4/4] Pushing tunnel URL to GitHub..."
-TS=$(python3 -c "import time; print(int(time.time()*1000))" 2>/dev/null || echo "$(date +%s)000")
-cat > ws-url.json << EOF
-{"url":"$TUNNEL_URL","updated":$TS}
-EOF
+if ! pgrep -f "cloudflared tunnel run" > /dev/null; then
+  nohup cloudflared tunnel run --token "$CF_TOKEN" > "$HOME/.cloudflared/agent-chat.log" 2>&1 &
+  echo "  [OK] Started named tunnel (PID $!)"
+else
+  echo "  [OK] Named tunnel already running"
+fi
 
-git add ws-url.json
-git commit -m "chore: update tunnel URL" --allow-empty 2>/dev/null || true
-git push origin main
+# Verify domain works
+echo "  Verifying https://agent-chat.org ..."
+VERIFY_OK=0
+for i in $(seq 1 15); do
+  if curl -s --max-time 5 "https://agent-chat.org/api/config" > /dev/null 2>&1; then
+    VERIFY_OK=1
+    break
+  fi
+  sleep 2
+done
 
+if [ "$VERIFY_OK" = "1" ]; then
+  echo "  [OK] https://agent-chat.org is live!"
+else
+  echo "  [WARN] Tunnel running but domain not yet reachable. Check DNS."
+fi
+
+# Step 4: Done
+echo "  [4/4] Done"
 echo ""
 echo "  =========================="
 echo "  All done!"
+echo "  Domain: https://agent-chat.org  (permanent address)"
 echo "  Local:  http://localhost:$PORT"
-echo "  Tunnel: $TUNNEL_URL"
 echo "  =========================="
 echo ""
 
-# Open browser (fixed Vercel URL)
-command -v open &> /dev/null && open 'https://agent-chat-d1m3.vercel.app'
-command -v xdg-open &> /dev/null && xdg-open 'https://agent-chat-d1m3.vercel.app'
+# Open browser
+command -v open &> /dev/null && open 'https://agent-chat.org'
+command -v xdg-open &> /dev/null && xdg-open 'https://agent-chat.org'
 
-echo "  Press Ctrl+C to stop all services"
-echo ""
 wait

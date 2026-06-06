@@ -4,3 +4,9 @@ data/
 .DS_Store
 .env
 config.json
+cloudflared-token.txt
+.bak-preagentchat
+
+# 备份文件（迁移到 agent-chat.org 之前的旧版本，可随时删）
+*.bak-preagentchat
+*.bak-20260606-*
