@@ -10,3 +10,12 @@ cloudflared-token.txt
 # 备份文件（迁移到 agent-chat.org 之前的旧版本，可随时删）
 *.bak-preagentchat
 *.bak-20260606-*
+
+# Secrets (推荐放在仓库外，比如 ~/.agent-chat-secrets.json)
+.agent-chat-secrets.json
+secrets.json
+*secrets*.json
+
+# Python
+__pycache__/
+*.pyc

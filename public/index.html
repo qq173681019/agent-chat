@@ -170,8 +170,15 @@ function join() {
       addMsg({ role: 'system', content: '✅ ' + data.content, time: data.time });
     }
   };
-  ws.onclose = () => { addMsg({ role: 'system', content: '⚠️ 连接断开，重连中...', time: Date.now() }); setTimeout(join, 3000); };
-  ws.onerror = () => {};
+  ws.onclose = (ev) => {
+    const reason = ev?.reason || ev?.code || '未知';
+    addMsg({ role: 'system', content: '⚠️ 连接断开 (code=' + (ev?.code || '?') + ' ' + reason + ')，3s 后重连...', time: Date.now() });
+    setTimeout(join, 3000);
+  };
+  ws.onerror = (e) => {
+    addMsg({ role: 'system', content: '❌ WebSocket 错误: ' + (e?.message || e?.type || '未知') + ' — 试 Cmd+Shift+R 强刷或换无痕模式', time: Date.now() });
+    console.error('[agent-chat] ws error:', e);
+  };
   document.getElementById('login').style.display = 'none';
   document.getElementById('chat').style.display = 'flex';
   document.getElementById('userLabel').textContent = userName;
