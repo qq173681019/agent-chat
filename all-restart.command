@@ -22,4 +22,4 @@ echo "  [中间] 等 2 秒..."
 sleep 2
 
 # 3. start
-bash "$SCRIPT_DIR/all-start.command" </dev/null
+bash "$SCRIPT_DIR/2人+多人一起启动.command" </dev/null
