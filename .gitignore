@@ -19,3 +19,6 @@ secrets.json
 # Python
 __pycache__/
 *.pyc
+
+# Multi-agent bot config (含 LLM 模型配置, 不入 git)
+multi-config-*.json
