@@ -32,6 +32,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .header-btn { background: var(--surface2); border: 1px solid #333; border-radius: 8px; padding: 6px 12px; color: var(--text); font-size: 13px; cursor: pointer; white-space: nowrap; }
 .header-btn:hover { background: #333; }
 .header-btn.export { color: var(--agent); border-color: var(--agent); }
+.header-btn.clear { color: var(--danger); border-color: var(--danger); }
+.header-btn.clear:hover { background: var(--danger); color: white; }
 .header-btn.import { color: var(--primary-light); border-color: var(--primary-light); }
 #messages { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
 .msg { margin-bottom: 10px; max-width: 80%; animation: fadeIn 0.2s; }
@@ -93,6 +95,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
       <button class="header-btn import" onclick="showImport()">📂</button>
       <button class="header-btn export" onclick="showExport()">💾</button>
+      <button class="header-btn clear" onclick="clearChat()" title="清空聊天记录（不保存）">🗑️</button>
     </div>
   </div>
   <div id="messages"></div>
@@ -190,6 +193,13 @@ function join() {
       document.getElementById('bot-a').textContent = cfg.botName;
     }
   }).catch(() => {});
+}
+
+function clearChat() {
+  if (!confirm('确认清空聊天记录吗?\\n(本地聊天界面将清空, 不会保存到服务器)')) return;
+  msgDiv.innerHTML = '';
+  currentMsgCount = 0;
+  addMsg({ role: 'system', content: '🗑️ 已清空聊天记录 (不保存到服务器)', time: Date.now() });
 }
 
 function addMsg(m) {
