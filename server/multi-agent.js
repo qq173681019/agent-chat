@@ -558,6 +558,35 @@ wss.on('connection', (ws) => {
 
           broadcast({ type: 'message', ...msg });
 
+          // 2026-06-13: user 停止/恢复指令识别 (跟 index.js 同样的 6 段规则)
+          if (currentUser.role === 'user') {
+            const STOP_KEYWORDS = ['停止','别聊了','停','安静','先别说话','暂停','你们都闭嘴','安静一下','先安静','别说了','够了','stop','shut up','silence','pause','别说话','先不聊了','别讲了','歇一歇'];
+            const RESUME_KEYWORDS = ['继续','接着说','在吗','resume','go ahead','说啊','说吧','接着聊','继续说'];
+            const text = (data.content || '').toLowerCase().trim();
+            const isStop = STOP_KEYWORDS.some(k => text === k.toLowerCase() || text.includes(k.toLowerCase()));
+            const isResume = RESUME_KEYWORDS.some(k => text === k.toLowerCase() || text.includes(k.toLowerCase()));
+            if (isStop) {
+              broadcast({ type: 'system', content: '🔇 收到停止指令, 所有 bot 静默待命', time: Date.now() });
+              getAgents().forEach(agent => {
+                const state = agentState[agent.id];
+                if (state?.ws && state.ws.readyState === WebSocket.OPEN) {
+                  state.ws.send(JSON.stringify({ type: 'pause' }));
+                }
+              });
+              break;
+            }
+            if (isResume) {
+              broadcast({ type: 'system', content: '🎙️ 收到恢复指令, bot 重新可回复', time: Date.now() });
+              getAgents().forEach(agent => {
+                const state = agentState[agent.id];
+                if (state?.ws && state.ws.readyState === WebSocket.OPEN) {
+                  state.ws.send(JSON.stringify({ type: 'resume' }));
+                }
+              });
+              break;
+            }
+          }
+
           // 通知 agents
           getAgents().forEach(agent => {
             const state = agentState[agent.id];

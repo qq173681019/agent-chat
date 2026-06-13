@@ -13,6 +13,12 @@ const WS_PING_TIMEOUT_MS = 60_000;
 const CROSS_CHAT_MAX_TURNS = 50;       // 上限 50 句 (user 要求)
 const CROSS_CHAT_SIMILARITY_STOP = 0.85; // 相似度阈值, 超过 = 一致答案 = 停
 
+// 2026-06-13: 停止/静默指令识别 (user 配 6 段, server 推 pause / resume 给所有 agent)
+const STOP_KEYWORDS = ['停止','别聊了','停','安静','先别说话','暂停','你们都闭嘴','安静一下','先安静','别说了','够了','stop','shut up','silence','pause','别说话','先不聊了','别讲了','歇一歇'];
+const RESUME_KEYWORDS = ['继续','接着说','在吗','resume','go ahead','说啊','说吧','接着聊','继续说'];
+function isStopCommand(text) { if (!text) return false; const t = text.toLowerCase().trim(); return STOP_KEYWORDS.some(k => t === k.toLowerCase() || t.includes(k.toLowerCase())); }
+function isResumeCommand(text) { if (!text) return false; const t = text.toLowerCase().trim(); return RESUME_KEYWORDS.some(k => t === k.toLowerCase() || t.includes(k.toLowerCase())); }
+
 // 简单的 jaccard 相似度 (字符级 bigram), 不引依赖
 function _bigrams(s) { const set = new Set(); for (let i = 0; i < s.length - 1; i++) set.add(s.substr(i, 2)); return set; }
 function _similarity(a, b) {
@@ -317,6 +323,30 @@ wss.on('connection', (ws) => {
           if (messages.length > MAX_IN_MEMORY) messages.shift();
           persistMessage(msg);
           broadcast({ type: 'message', ...msg });
+
+          // 2026-06-13: user 停止/恢复指令识别
+          if (currentUser.role === 'user' && isStopCommand(data.content)) {
+            broadcast({ type: 'system', content: '🔇 收到停止指令, 所有 bot 静默待命', time: Date.now() });
+            Object.values(agents).forEach(agent => {
+              if (agent.ws && agent.ws.readyState === WebSocket.OPEN) {
+                agent.ws.send(JSON.stringify({ type: 'pause' }));
+              }
+            });
+            _crossChatTriggerMsg = null;
+            _crossChatTurn = 0;
+            _lastAgentReply = null;
+            break;
+          }
+          if (currentUser.role === 'user' && isResumeCommand(data.content)) {
+            broadcast({ type: 'system', content: '🎙️ 收到恢复指令, bot 重新可回复', time: Date.now() });
+            Object.values(agents).forEach(agent => {
+              if (agent.ws && agent.ws.readyState === WebSocket.OPEN) {
+                agent.ws.send(JSON.stringify({ type: 'resume' }));
+              }
+            });
+            break;
+          }
+
           if (currentUser.role === 'user') {
             // 2026-06-13: user 触发新一轮互聊, 重置 state
             _crossChatTurn = 0;
