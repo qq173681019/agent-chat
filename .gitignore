@@ -22,3 +22,10 @@ __pycache__/
 
 # Multi-agent bot config (含 LLM 模型配置, 不入 git)
 multi-config-*.json
+
+# 2026 调试/备份文件 (清理 6/13)
+*.bak-2026-*
+reply-*.json
+test-msg.json
+ws-url.json
+cron-payload.txt
