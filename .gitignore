@@ -1,18 +1,13 @@
-# Dependencies
 node_modules/
 data/
 *.log
 .DS_Store
 .env
-
-# Local configs (secrets — keep out of repo)
 config.json
-config-b.json
-cloudflared.exe
 cloudflared-token.txt
-.poller_*_lastid
-ws-url.json
 .bak-preagentchat
+
+# 备份文件（迁移到 agent-chat.org 之前的旧版本，可随时删）
 *.bak-preagentchat
 *.bak-20260606-*
 
@@ -24,3 +19,13 @@ secrets.json
 # Python
 __pycache__/
 *.pyc
+
+# Multi-agent bot config (含 LLM 模型配置, 不入 git)
+multi-config-*.json
+
+# 2026 调试/备份文件 (清理 6/13)
+*.bak-2026-*
+reply-*.json
+test-msg.json
+ws-url.json
+cron-payload.txt
