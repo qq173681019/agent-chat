@@ -66,7 +66,8 @@ function connect() {
   ws = new WebSocket(SERVER_URL);
   ws.on('open', () => {
     console.log(`[Agent] ✅ 连接成功`);
-    ws.send(JSON.stringify({ type: 'join', name: BOT_NAME, role: BOT_ROLE }));
+    // 2026-06-13: 兼容 2 套 server: index.js (认 role) / multi-agent.js (认 agentId)
+    ws.send(JSON.stringify({ type: 'join', name: BOT_NAME, role: BOT_ROLE, agentId: BOT_ROLE }));
   });
   ws.on('message', async (raw) => {
     const data = JSON.parse(raw);
