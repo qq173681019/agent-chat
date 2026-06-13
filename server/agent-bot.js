@@ -60,6 +60,37 @@ let currentTurnModel = PRIMARY_MODEL;  // 当前回复用的模型, 给 agent_qu
 // 2026-06-13: 沉默模式 (server 推 pause/resume 控制)
 let silentMode = false;
 
+
+// 2026-06-13 16:08: 修协议 — 5 bot 改 HTTP POST /api/reply 给 multi-agent.js (3001).
+// 之前用 WS agent_reply, 3001 server 不收, 5 bot 一直是哑巴.
+// 保留 WS 收 agent_query, 发改 HTTP 发 reply.
+const HTTP_REPLY_PATH = '/api/reply';
+function postReply(payload) {
+  // 从 SERVER_URL (ws://host:port) 解析 http://host:port
+  let httpUrl = SERVER_URL;
+  if (httpUrl.startsWith('ws://')) httpUrl = 'http://' + httpUrl.slice(5);
+  else if (httpUrl.startsWith('wss://')) httpUrl = 'https://' + httpUrl.slice(6);
+  // 去掉 ws 路径 (e.g. ws://localhost:3001/path)
+  const u = new URL(httpUrl);
+  const opts = {
+    hostname: u.hostname,
+    port: u.port || (u.protocol === 'https:' ? 443 : 80),
+    path: HTTP_REPLY_PATH,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  };
+  const body = JSON.stringify(payload);
+  const mod = u.protocol === 'https:' ? require('https') : require('http');
+  const req = mod.request(opts, (res) => {
+    if (res.statusCode !== 200) {
+      console.error(`[Agent] HTTP /api/reply 失败: ${res.statusCode}`);
+    }
+  });
+  req.on('error', (e) => console.error(`[Agent] HTTP /api/reply 错误: ${e.message}`));
+  req.write(body);
+  req.end();
+}
+
 function connect() {
   console.log(`[Agent] ${BOT_NAME} (${BOT_ROLE}) models=${MODELS.join(' -> ')}`);
   console.log(`[Agent] 连接到 ${SERVER_URL} ...`);
@@ -110,20 +141,25 @@ function connect() {
         currentTurnModel = result.model;
         const isFallback = result.model !== PRIMARY_MODEL;
         const prefix = isFallback ? FALLBACK_PREFIX : '';
+        // 2026-06-13 16:08: 修协议 — 走 HTTP POST /api/reply 给 multi-agent.js (3001)
+        // 之前走 WS agent_reply, 3001 server 不收, 5 bot 一直是哑巴
+        // WS 留作收 agent_query, 发改 HTTP
         const reply = {
-          type: 'agent_reply',
+          role: BOT_ROLE,
+          from: BOT_NAME,
           content: result.text,
-          replyTo: data.message.id,
-          fromPrefix: prefix || undefined  // undefined 让 server 端不处理
+          fromPrefix: prefix || undefined,
+          replyTo: data.message.id
         };
-        ws.send(JSON.stringify(reply));
+        postReply(reply);
         conversationHistory.push({ role: 'assistant', content: result.text });
         console.log(`[Agent] 回复 (${result.model}${isFallback ? ' ⚠️FALLBACK' : ''}): ${result.text.substring(0, 60)}`);
       } catch (e) {
         console.error('[Agent] 全部模型都失败:', e.message);
         currentTurnModel = PRIMARY_MODEL;
         // 全部失败: 不加前缀 (这不是 fallback, 是 catch-all 兜底句)
-        ws.send(JSON.stringify({ type: 'agent_reply', content: '嗯...脑子卡了一下 🤔', replyTo: data.message.id }));
+        // 全部失败: 不加前缀 (这不是 fallback, 是 catch-all 兜底句)
+        postReply({ role: BOT_ROLE, from: BOT_NAME, content: '嗯...脑子卡了一下 🤔', replyTo: data.message.id });
       }
     }
   });
