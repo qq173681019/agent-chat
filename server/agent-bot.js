@@ -105,7 +105,9 @@ async function callLLMWithFallback(history) {
   let lastErr = null;
   for (let i = 0; i < MODELS.length; i++) {
     const m = MODELS[i];
-    const fmt = m.toLowerCase().includes('minimax') ? 'anthropic' : 'openai';
+    // 2026-06-13: zhipu anthropic endpoint 也用 'x-api-key' (跟 minimax 一致), model 包含 'glm' 也走 anthropic
+    const ml = m.toLowerCase();
+    const fmt = (ml.includes('minimax') || ml.includes('glm')) ? 'anthropic' : 'openai';
     try {
       const text = fmt === 'anthropic' ? await callAnthropic(history, m) : await callOpenAI(history, m);
       return { text, model: m };
