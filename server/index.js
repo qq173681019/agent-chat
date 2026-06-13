@@ -9,6 +9,23 @@ const MESSAGES_LOG = path.join(DATA_DIR, 'messages.log');
 const MAX_IN_MEMORY = 500;
 const WS_PING_INTERVAL_MS = 30_000;
 const WS_PING_TIMEOUT_MS = 60_000;
+// 2026-06-13: bot 间互聊 (轻互聊 C 方案) — 加 2 个护栏
+const CROSS_CHAT_MAX_TURNS = 50;       // 上限 50 句 (user 要求)
+const CROSS_CHAT_SIMILARITY_STOP = 0.85; // 相似度阈值, 超过 = 一致答案 = 停
+
+// 简单的 jaccard 相似度 (字符级 bigram), 不引依赖
+function _bigrams(s) { const set = new Set(); for (let i = 0; i < s.length - 1; i++) set.add(s.substr(i, 2)); return set; }
+function _similarity(a, b) {
+  if (!a || !b) return 0;
+  const A = _bigrams(a), B = _bigrams(b);
+  if (A.size === 0 || B.size === 0) return 0;
+  let inter = 0; A.forEach(x => { if (B.has(x)) inter++; });
+  return inter / (A.size + B.size - inter);
+}
+// 模块级 state: 当前 user message 触发的 bot 间互聊
+let _crossChatTurn = 0;        // 已经互聊多少轮
+let _crossChatTriggerMsg = null; // 触发互聊的 user message (对象), user 下一句重置
+let _lastAgentReply = null;     // 上一个 bot reply (用于相似度判断)
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -301,6 +318,10 @@ wss.on('connection', (ws) => {
           persistMessage(msg);
           broadcast({ type: 'message', ...msg });
           if (currentUser.role === 'user') {
+            // 2026-06-13: user 触发新一轮互聊, 重置 state
+            _crossChatTurn = 0;
+            _crossChatTriggerMsg = msg;
+            _lastAgentReply = null;
             Object.values(agents).forEach(agent => {
               if (agent.ws && agent.ws.readyState === WebSocket.OPEN) {
                 agent.ws.send(JSON.stringify({ type: 'agent_query', message: msg, agent_role: agent === agents['agent-a'] ? 'agent-a' : 'agent-b' }));
@@ -316,7 +337,35 @@ wss.on('connection', (ws) => {
           if (messages.length > MAX_IN_MEMORY) messages.shift();
           persistMessage(reply);
           broadcast({ type: 'message', ...reply });
-          // (2026-06-07) 不再自动推 agent_query — 避免 agent 无限互聊循环
+
+          // 2026-06-13: bot 间轻互聊 (C 方案 + 护栏)
+          // 护栏: 1) 上限 50 轮 2) 上一句 bot reply 跟这句相似 > 0.85 = 一致答案 = 停
+          //        3) 这句 reply 跟触发它的 agent_query 也相似 > 0.85 = bot 在复读 = 停
+          if (_crossChatTriggerMsg && currentUser.role && currentUser.role.startsWith('agent-')) {
+            // 3 个停止条件
+            const tooManyTurns = _crossChatTurn >= CROSS_CHAT_MAX_TURNS;
+            const sameAsPrev = _lastAgentReply && _similarity(_lastAgentReply.content, reply.content) > CROSS_CHAT_SIMILARITY_STOP;
+            const sameAsQuery = _similarity(_crossChatTriggerMsg.content, reply.content) > CROSS_CHAT_SIMILARITY_STOP;
+            const stopReason = tooManyTurns ? 'max_turns' : (sameAsPrev ? 'consensus' : (sameAsQuery ? 'echo' : null));
+            if (stopReason) {
+              const stopMsg = stopReason === 'max_turns' ? `🛑 bot 间互聊达到上限 (${CROSS_CHAT_MAX_TURNS} 轮), 停止` :
+                              stopReason === 'consensus' ? `🤝 2 bot 答案一致, 停止互聊` :
+                                                            `🔁 bot 复读, 停止互聊`;
+              broadcast({ type: 'system', content: stopMsg, time: Date.now() });
+              _crossChatTriggerMsg = null;
+              _crossChatTurn = 0;
+              _lastAgentReply = null;
+              break;
+            }
+            // 推给另一个 bot (不是自己)
+            const otherRole = currentUser.role === 'agent-a' ? 'agent-b' : 'agent-a';
+            const other = agents[otherRole];
+            if (other && other.ws && other.ws.readyState === WebSocket.OPEN) {
+              _crossChatTurn++;
+              _lastAgentReply = reply;
+              other.ws.send(JSON.stringify({ type: 'agent_query', message: reply, agent_role: otherRole }));
+            }
+          }
           break;
       }
     } catch (e) { console.error('消息解析错误:', e.message); }
