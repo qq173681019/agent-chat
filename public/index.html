@@ -40,6 +40,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .dot.off { background: var(--text-muted); }
 .header-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--text-dim); font-size: 13px; cursor: pointer; }
 .header-btn:hover { background: var(--surface3); color: var(--text); }
+.header-btn.clear { color: var(--danger); border-color: var(--danger); }
+.header-btn.clear:hover { background: var(--danger); color: white; }
 
 /* Connection badge */
 .conn-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: var(--surface2); display: flex; align-items: center; gap: 4px; }
@@ -127,6 +129,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
       <button class="header-btn" onclick="showImport()">📂</button>
       <button class="header-btn" onclick="showExport()">💾</button>
+      <button class="header-btn clear" onclick="clearChat()" title="清空聊天记录（不保存）">🗑️</button>
     </div>
   </div>
   <div id="messages"></div>
@@ -250,6 +253,13 @@ function connectWS() {
       document.getElementById('bot-a').textContent = cfg.botName;
     }
   }).catch(() => {});
+}
+
+function clearChat() {
+  if (!confirm('确认清空聊天记录吗?\\n(本地聊天界面将清空, 不会保存到服务器)')) return;
+  msgDiv.innerHTML = '';
+  currentMsgCount = 0;
+  addMsg({ role: 'system', content: '🗑️ 已清空聊天记录 (不保存到服务器)', time: Date.now() });
 }
 
 function updateConn(status, text) {
