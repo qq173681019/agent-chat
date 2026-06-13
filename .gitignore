@@ -17,7 +17,6 @@ secrets.json
 *secrets*.json
 
 # Python
-__pycache__/
 *.pyc
 
 # Multi-agent bot config (含 LLM 模型配置, 不入 git)
@@ -29,3 +28,6 @@ reply-*.json
 test-msg.json
 ws-url.json
 cron-payload.txt
+
+# Misc cleanup (6/13)
+$null
