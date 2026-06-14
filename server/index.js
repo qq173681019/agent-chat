@@ -15,7 +15,7 @@ const CROSS_CHAT_MAX_TURNS = 50;       // 上限 50 句 (user 要求)
 // 2026-06-14 13:29: pacing 是主护栏, 互聊 20s 间隔 (bot-to-bot 15-30s band)
 // user 原话: "两个机器人聊的太快了, 聊天间可以再长一些, 另外似乎他们没有好好思考啊"
 // 删掉相似度护栏 (user 没要, 之前"我并没有让你加护栏"原则)
-const CROSS_CHAT_REPLY_DELAY = 15000;   // 15s (3000 端 2 bot, 用 band 下限, 节奏比 3001 端 5 bot 紧凑)
+const CROSS_CHAT_REPLY_DELAY = 20000;   // 20s (pacing band 中位, 跟 3001 端 5 bot 一致)
 // 注: 50 句上限保留 (user 之前自己要求), 是 backstop, 不是主护栏
 
 // 2026-06-13: 停止/静默指令识别 (user 配 6 段, server 推 pause / resume 给所有 agent)
@@ -201,7 +201,7 @@ const server = http.createServer((req, res) => {
               _lastAgentReply = reply.content;
               setTimeout(() => {
                 if (other && other.ws && other.ws.readyState === WebSocket.OPEN) {
-                  other.ws.send(JSON.stringify({ type: 'agent_query', message: reply.content, agent_role: otherRole }));
+                  other.ws.send(JSON.stringify({ type: 'agent_query', message: { content: reply.content, from: reply.from, role: reply.role }, agent_role: otherRole }));
                   console.log(`[REPLY-HTTP] 推给 ${otherRole}`);
                 }
               }, CROSS_CHAT_REPLY_DELAY);
